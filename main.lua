@@ -1,7 +1,6 @@
-local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
-
 -- ==========================================
--- 0. ตัวแปรส่วนกลาง (Global Variables)
+-- [สำคัญที่สุด] ระบบปลดล็อคปุ่มเดินและกระโดดบนมือถือแบบเด็ดขาด
+-- ต้องรันก่อนโหลด UI เพื่อดักจับ ControlModule ของ Roblox
 -- ==========================================
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -9,6 +8,93 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local VirtualUser = game:GetService("VirtualUser")
 
+local function PermanentMobileFix()
+    -- 1. Hook และป้องกันไม่ให้ Roblox สั่ง Disable ปุ่มเดิน/กระโดด
+    local function patchControls()
+        pcall(function()
+            local PlayerScripts = LocalPlayer:WaitForChild("PlayerScripts", 5)
+            if not PlayerScripts then return end
+            
+            local PlayerModule = require(PlayerScripts:WaitForChild("PlayerModule", 5))
+            local Controls = PlayerModule:GetControls()
+            
+            if Controls then
+                Controls:Enable(true)
+                -- ล็อคไม่ให้ฟังก์ชัน Disable ทำงานได้
+                Controls.Disable = function(self)
+                    if self.activeController then
+                        self.activeController:Enable(true)
+                    end
+                    if self.touchControlFrame then
+                        self.touchControlFrame.Visible = true
+                    end
+                end
+            end
+        end)
+    end
+    
+    task.spawn(patchControls)
+    LocalPlayer.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        patchControls()
+    end)
+
+    -- 2. ปลดล็อค Modal ทุกชิ้นแบบ Realtime ด้วย Property Signal
+    local function removeModal(obj)
+        if obj:IsA("GuiObject") then
+            if obj.Modal then obj.Modal = false end
+            obj:GetPropertyChangedSignal("Modal"):Connect(function()
+                if obj.Modal then
+                    obj.Modal = false
+                end
+            end)
+        end
+    end
+
+    local containers = { LocalPlayer:WaitForChild("PlayerGui") }
+    if gethui then pcall(function() table.insert(containers, gethui()) end) end
+    pcall(function() table.insert(containers, game:GetService("CoreGui")) end)
+
+    for _, container in ipairs(containers) do
+        for _, desc in ipairs(container:GetDescendants()) do
+            removeModal(desc)
+        end
+        container.DescendantAdded:Connect(removeModal)
+    end
+
+    -- 3. บังคับ TouchGui, TouchControlFrame และ JumpButton ให้แสดงผลตลอดเวลา
+    RunService.RenderStepped:Connect(function()
+        pcall(function()
+            LocalPlayer.DevTouchMovementMode = Enum.DevTouchMovementMode.DynamicThumbstick
+            
+            local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+            if playerGui then
+                local touchGui = playerGui:FindFirstChild("TouchGui")
+                if touchGui then
+                    touchGui.Enabled = true
+                    local tcf = touchGui:FindFirstChild("TouchControlFrame")
+                    if tcf then
+                        tcf.Visible = true
+                        local jump = tcf:FindFirstChild("JumpButton")
+                        if jump then jump.Visible = true end
+                        local stick = tcf:FindFirstChild("DynamicThumbstickFrame")
+                        if stick then stick.Visible = true end
+                    end
+                end
+            end
+        end)
+    end)
+end
+
+-- สั่งเริ่มระบบปลดล็อคปุ่มเดินทันที
+PermanentMobileFix()
+
+-- ==========================================
+-- 1. โหลด Fluent UI และสร้างหน้าต่างหลัก
+-- ==========================================
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+
+-- ตัวแปรระบบฟาร์มและการตั้งค่า
 _G.AutoFarm = false
 _G.AutoSell = false
 _G.AutoBuySwords = false
@@ -27,7 +113,7 @@ _G.Noclip = false
 _G.Flying = false
 _G.FlySpeed = 50
 
--- รายชื่อพิกัดเกาะทั้งหมดใน Ninja Legends
+-- พิกัดเกาะทั้งหมด
 local Islands = {
     ["Ground / Spawn"] = CFrame.new(25, 3, 22),
     ["Enchanted Island"] = CFrame.new(51, 766, -138),
@@ -57,15 +143,12 @@ for name, _ in pairs(Islands) do
     table.insert(IslandNames, name)
 end
 
--- ==========================================
--- 1. สร้าง UI หลัก (Fluent UI)
--- ==========================================
 local Window = Fluent:CreateWindow({
     Title = "Ninja Legends Hub",
-    SubTitle = "Mobile Fixed Edition",
+    SubTitle = "Mobile Controls Fixed",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
-    Acrylic = false, -- ปิด Acrylic เพื่อแก้ปัญหาทัชติดขัดบนมือถือ
+    Acrylic = false, -- ต้องปิด Acrylic เพื่อป้องกันการบล็อกปุ่มทัชบนมือถือ
     Theme = "Dark",
     MinimizeKey = Enum.KeyCode.RightControl
 })
@@ -82,8 +165,8 @@ local Tabs = {
 -- Tab 1: Main / Auto Farm
 -- ------------------------------------------
 Tabs.Main:AddParagraph({
-    Title = "Ninja Legends Auto Farm",
-    Content = "เปิด-ปิดระบบฟาร์มอัตโนมัติและระบบขายของ"
+    Title = "Auto Farm",
+    Content = "ระบบฟาร์มเหรียญ/Chi และขายอัตโนมัติ"
 })
 
 Tabs.Main:AddToggle("AutoFarmToggle", {
@@ -130,11 +213,6 @@ Tabs.Main:AddToggle("AutoSellToggle", {
 -- ------------------------------------------
 -- Tab 2: Auto Buy
 -- ------------------------------------------
-Tabs.AutoBuy:AddParagraph({
-    Title = "Auto Shop",
-    Content = "ระบบซื้อไอเทมในร้านค้าอัตโนมัติ"
-})
-
 Tabs.AutoBuy:AddToggle("AutoSwords", {
     Title = "Auto Buy All Swords (ซื้อดาบทั้งหมด)",
     Default = false,
@@ -236,14 +314,8 @@ Tabs.AutoBuy:AddToggle("AutoRanks", {
 })
 
 -- ------------------------------------------
--- Tab 3: Player / WalkSpeed / Fly / Jump
+-- Tab 3: Player / Movement & Fly
 -- ------------------------------------------
-Tabs.Player:AddParagraph({
-    Title = "Movement Settings",
-    Content = "ปรับความเร็วการเคลื่อนที่ การบิน และการกระโดด"
-})
-
--- WalkSpeed
 Tabs.Player:AddToggle("SpeedToggle", {
     Title = "Enable WalkSpeed (เปิดความเร็วเดิน)",
     Default = false,
@@ -256,8 +328,7 @@ Tabs.Player:AddToggle("SpeedToggle", {
 })
 
 Tabs.Player:AddSlider("SpeedSlider", {
-    Title = "WalkSpeed Value (ความเร็วเดิน)",
-    Description = "ปรับความเร็วเดินของตัวละคร",
+    Title = "WalkSpeed Value",
     Default = 16,
     Min = 16,
     Max = 300,
@@ -267,7 +338,6 @@ Tabs.Player:AddSlider("SpeedSlider", {
     end
 })
 
--- JumpPower
 Tabs.Player:AddToggle("JumpToggle", {
     Title = "Enable JumpPower (เปิดแรงกระโดด)",
     Default = false,
@@ -280,8 +350,7 @@ Tabs.Player:AddToggle("JumpToggle", {
 })
 
 Tabs.Player:AddSlider("JumpSlider", {
-    Title = "JumpPower Value (แรงกระโดด)",
-    Description = "ปรับความสูงในการกระโดด",
+    Title = "JumpPower Value",
     Default = 50,
     Min = 50,
     Max = 300,
@@ -291,9 +360,8 @@ Tabs.Player:AddSlider("JumpSlider", {
     end
 })
 
--- Infinite Jump
 Tabs.Player:AddToggle("InfJumpToggle", {
-    Title = "Infinite Jump (กระโดดลอยบนฟ้าได้ไม่จำกัด)",
+    Title = "Infinite Jump (กระโดดไม่จำกัด)",
     Default = false,
     Callback = function(state)
         _G.InfJump = state
@@ -342,7 +410,7 @@ local function startFly()
 end
 
 Tabs.Player:AddToggle("FlyToggle", {
-    Title = "Fly (เปิด/ปิด ระบบบิน - ใช้ได้ทั้งคอมและมือถือ)",
+    Title = "Fly (บิน - ควบคุมด้วยปุ่มเดินหรือหน้าจอ)",
     Default = false,
     Callback = function(state)
         _G.Flying = state
@@ -356,8 +424,7 @@ Tabs.Player:AddToggle("FlyToggle", {
 })
 
 Tabs.Player:AddSlider("FlySpeedSlider", {
-    Title = "Fly Speed (ความเร็วการบิน)",
-    Description = "ปรับความเร็วในการบิน",
+    Title = "Fly Speed (ความเร็วบิน)",
     Default = 50,
     Min = 10,
     Max = 300,
@@ -367,7 +434,6 @@ Tabs.Player:AddSlider("FlySpeedSlider", {
     end
 })
 
--- Noclip
 Tabs.Player:AddToggle("NoclipToggle", {
     Title = "Noclip (เดินทะลุกำแพง)",
     Default = false,
@@ -386,7 +452,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- ลูปบังคับ WalkSpeed & JumpPower
+-- ลูปความเร็วเดินและกระโดด
 task.spawn(function()
     while true do
         task.wait(0.1)
@@ -405,16 +471,11 @@ task.spawn(function()
 end)
 
 -- ------------------------------------------
--- Tab 4: Teleport (วาร์ปเกาะ)
+-- Tab 4: Teleport (วาร์ป)
 -- ------------------------------------------
-Tabs.Teleport:AddParagraph({
-    Title = "Island Teleports",
-    Content = "เลือกเกาะที่ต้องการวาร์ปไปได้ทันที"
-})
-
 local SelectedIsland = "Ground / Spawn"
 
-local Dropdown = Tabs.Teleport:AddDropdown("IslandDropdown", {
+Tabs.Teleport:AddDropdown("IslandDropdown", {
     Title = "Select Island (เลือกเกาะ)",
     Values = IslandNames,
     Multi = false,
@@ -426,7 +487,7 @@ local Dropdown = Tabs.Teleport:AddDropdown("IslandDropdown", {
 
 Tabs.Teleport:AddButton({
     Title = "Teleport to Selected Island",
-    Description = "วาร์ปไปยังเกาะที่เลือกใน Dropdown",
+    Description = "วาร์ปไปยังเกาะที่เลือก",
     Callback = function()
         if Islands[SelectedIsland] and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
             LocalPlayer.Character.HumanoidRootPart.CFrame = Islands[SelectedIsland]
@@ -436,7 +497,7 @@ Tabs.Teleport:AddButton({
 
 Tabs.Teleport:AddButton({
     Title = "Unlock All Islands (ปลดล็อคทุกเกาะ)",
-    Description = "วาร์ปไปแตะทุกเกาะเพื่อปลดล็อคให้ครบ",
+    Description = "วาร์ปแตะทุกเกาะอัตโนมัติ",
     Callback = function()
         task.spawn(function()
             for name, cframe in pairs(Islands) do
@@ -450,14 +511,8 @@ Tabs.Teleport:AddButton({
 })
 
 -- ------------------------------------------
--- Tab 5: Misc & Settings
+-- Tab 5: Misc
 -- ------------------------------------------
-Tabs.Misc:AddParagraph({
-    Title = "Miscellaneous",
-    Content = "ฟังก์ชั่นช่วยเหลือเพิ่มเติม"
-})
-
--- Anti-AFK Hook
 LocalPlayer.Idled:Connect(function()
     VirtualUser:CaptureController()
     VirtualUser:ClickButton2(Vector2.new(0, 0))
@@ -466,7 +521,7 @@ end)
 Window:SelectTab(1)
 
 -- ==========================================
--- 2. ส่วนของปุ่มโลโก้เปิด-ปิด UI (Floating Button)
+-- 2. ปุ่มโลโก้ลอย เปิด-ปิด UI สำหรับมือถือ
 -- ==========================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MyLogoToggle"
@@ -537,55 +592,4 @@ LogoButton.MouseButton1Click:Connect(function()
     vim:SendKeyEvent(true, Enum.KeyCode.RightControl, false, game)
     task.wait(0.05) 
     vim:SendKeyEvent(false, Enum.KeyCode.RightControl, false, game)
-end)
-
--- ==========================================
--- 3. ระบบแก้บัคปุ่มเดิน/กระโดดหายบนมือถือ (Ultimate Touch Fix)
--- ==========================================
-task.spawn(function()
-    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-
-    -- 1. ปิด Modal ทันทีที่ UI หรือองค์ประกอบใหม่ถูกโหลด
-    local function cleanModal(v)
-        if v:IsA("GuiObject") and v.Modal then
-            v.Modal = false
-        end
-    end
-
-    local uiContainers = { PlayerGui }
-    if gethui then pcall(function() table.insert(uiContainers, gethui()) end) end
-    pcall(function() table.insert(uiContainers, game:GetService("CoreGui")) end)
-
-    for _, container in ipairs(uiContainers) do
-        for _, desc in ipairs(container:GetDescendants()) do
-            cleanModal(desc)
-        end
-        container.DescendantAdded:Connect(cleanModal)
-    end
-
-    -- 2. บังคับ TouchGui และปุ่มคอนโทรลทุกชิ้นให้ Visible ตลอดเวลาในระดับ RenderStepped
-    RunService.RenderStepped:Connect(function()
-        pcall(function()
-            LocalPlayer.DevTouchMovementMode = Enum.DevTouchMovementMode.DynamicThumbstick
-            
-            local touchGui = PlayerGui:FindFirstChild("TouchGui")
-            if touchGui then
-                touchGui.Enabled = true
-                local touchControl = touchGui:FindFirstChild("TouchControlFrame")
-                if touchControl then
-                    touchControl.Visible = true
-                    
-                    local jumpButton = touchControl:FindFirstChild("JumpButton")
-                    if jumpButton then
-                        jumpButton.Visible = true
-                    end
-                    
-                    local dynamicStick = touchControl:FindFirstChild("DynamicThumbstickFrame")
-                    if dynamicStick then
-                        dynamicStick.Visible = true
-                    end
-                end
-            end
-        end)
-    end)
 end)
