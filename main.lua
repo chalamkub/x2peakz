@@ -29,7 +29,6 @@ local Toggle = Tabs.Main:AddToggle("AutoFarmToggle", {
             task.spawn(function()
                 while _G.AutoFarm do
                     local args = { "swingKatana" }
-                    -- เพิ่ม pcall ป้องกันสคริปต์พังถ้าหา event ไม่เจอ
                     pcall(function()
                         game:GetService("Players").LocalPlayer:WaitForChild("ninjaEvent"):FireServer(unpack(args))
                     end)
@@ -48,7 +47,6 @@ Window:SelectTab(1)
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MyLogoToggle"
 
--- [แก้ปัญหา 1] หาที่อยู่ให้ UI ตามการรองรับของตัวรัน
 local guiParent
 if gethui then
     guiParent = gethui()
@@ -70,14 +68,12 @@ LogoButton.BackgroundTransparency = 1
 LogoButton.Position = UDim2.new(0.1, 0, 0.1, 0) 
 LogoButton.Size = UDim2.new(0, 50, 0, 50) 
 
--- [แก้ปัญหา 2] ใช้ rbxthumb ดึงรูปจาก Decal ID ได้ทันที หมดปัญหารูปไม่โหลด
 LogoButton.Image = "rbxthumb://type=Asset&id=138065724886036&w=150&h=150" 
 
 local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0.5, 0)
 UICorner.Parent = LogoButton
 
--- ระบบลากปุ่ม (Draggable)
 local dragging, dragInput, dragStart, startPos
 
 local function update(input)
@@ -111,10 +107,30 @@ game:GetService("UserInputService").InputChanged:Connect(function(input)
     end
 end)
 
--- ระบบกดปุ่มโลโก้เพื่อเปิด/ปิด UI
 LogoButton.MouseButton1Click:Connect(function()
     local vim = game:GetService("VirtualInputManager")
     vim:SendKeyEvent(true, Enum.KeyCode.RightControl, false, game)
-    task.wait(0.05) -- ใส่ดีเลย์นิดหน่อยกันกดไม่ติด
+    task.wait(0.05) 
     vim:SendKeyEvent(false, Enum.KeyCode.RightControl, false, game)
+end)
+
+-- ==========================================
+-- 3. ระบบแก้ปัญหาปุ่มเดิน/กระโดดหายบนมือถือ (Anti-Modal)
+-- ==========================================
+task.spawn(function()
+    while task.wait(0.5) do 
+        pcall(function()
+            local uiParents = { game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui") }
+            if gethui then table.insert(uiParents, gethui()) end
+            pcall(function() table.insert(uiParents, game:GetService("CoreGui")) end)
+
+            for _, parent in pairs(uiParents) do
+                for _, v in pairs(parent:GetDescendants()) do
+                    if v:IsA("GuiObject") and v.Modal then
+                        v.Modal = false
+                    end
+                end
+            end
+        end)
+    end
 end)
