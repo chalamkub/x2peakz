@@ -557,19 +557,22 @@ task.spawn(function()
 
     -- วนปลดล็อคค่า Modal ของทุก UI ไม่ให้ดักการทัช
     while true do
-        task.wait(0.2)
-        pcall(function()
-            local uiContainers = { playerGui }
-            if gethui then table.insert(uiContainers, gethui()) end
-            pcall(function() table.insert(uiContainers, game:GetService("CoreGui")) end)
+    task.wait(0.2)
+    pcall(function()
+        local uiContainers = { playerGui }
+        if gethui then table.insert(uiContainers, gethui()) end
+        pcall(function() table.insert(uiContainers, game:GetService("CoreGui")) end)
 
-            for _, container in ipairs(uiContainers) do
-                for _, v in pairs(container:GetDescendants()) do
-                    if v:IsA("GuiObject") and v.Modal then
+        for _, container in ipairs(uiContainers) do
+            for _, v in pairs(container:GetDescendants()) do
+                if v:IsA("GuiObject") and v.Modal then
+                    -- ข้าม ScreenGui ของ Fluent ไม่ให้โดนรีเซ็ต Modal
+                    local screenGui = v:FindFirstAncestorWhichIsA("ScreenGui")
+                    if not screenGui or not screenGui.Name:find("Fluent") then
                         v.Modal = false
                     end
                 end
             end
-        end)
-    end
-end)
+        end
+    end)
+end
