@@ -18,7 +18,7 @@ if not LocalPlayer then
     LocalPlayer = Players.LocalPlayer
 end
 
--- ระบบป้องกัน UI ซ้อนกันเมื่อรันสคริปต์ซ้ำ (Anti-Duplicate / Clean Old Instance)
+-- ป้องกัน UI ซ้อนกันเมื่อรันสคริปต์ซ้ำ (Anti-Duplicate System)
 if _G.BloxFruitsHubInstance then
     pcall(function()
         _G.BloxFruitsHubInstance:Destroy()
@@ -44,54 +44,44 @@ local HubState = {
 }
 _G.BloxFruitsHubInstance = HubState
 
--- พิกัด Teleport สำหรับโปรเจกต์ Blox Fruits / Universal Hub
+-- ตารางพิกัดสำหรับระบบ Teleport
 local Locations = {
     ["Spawn"] = CFrame.new(0, 50, 0),
-    ["Island 1 (Starter Island)"] = CFrame.new(1050, 45, 1200),
-    ["Island 2 (Pirate Village)"] = CFrame.new(-1200, 50, 1800),
-    ["Island 3 (Desert Area)"] = CFrame.new(2400, 60, -950),
+    ["Island 1"] = CFrame.new(1050, 45, 1200),
+    ["Island 2"] = CFrame.new(-1200, 50, 1800),
+    ["Island 3"] = CFrame.new(2400, 60, -950),
     ["Boss Area"] = CFrame.new(3500, 120, 3100),
-    ["Shop / Merchant"] = CFrame.new(-450, 30, -780),
+    ["Shop"] = CFrame.new(-450, 30, -780),
     ["Safe Zone"] = CFrame.new(50, 100, 50)
 }
 
--- จุดสำคัญสำหรับระบบ Visual POI Debug
+-- ตารางจุดสำคัญสำหรับระบบ Visual POI
 local PointsOfInterest = {
-    ["Fruit Dealer"] = Vector3.new(-450, 30, -780),
+    ["Shop / Merchant"] = Vector3.new(-450, 30, -780),
     ["Quest Giver"] = Vector3.new(100, 20, 150),
     ["Boss Spawn"] = Vector3.new(3500, 120, 3100),
-    ["Safe Zone Center"] = Vector3.new(50, 100, 50)
+    ["Safe Zone"] = Vector3.new(50, 100, 50)
 }
 
 -- ==========================================================
 -- Fluent Library
 -- ==========================================================
-local FluentSuccess, Fluent = pcall(function()
-    return loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
-end)
+local Library = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 
-if not FluentSuccess or not Fluent then
-    warn("[Blox Fruits Hub Error] ไม่สามารถดาวน์โหลด Fluent Library ได้")
+if not Library then
+    warn("[Blox Fruits Hub] ไม่สามารถโหลด Fluent Library ได้")
     return
 end
-
-local SaveManagerSuccess, SaveManager = pcall(function()
-    return loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
-end)
-
-local InterfaceManagerSuccess, InterfaceManager = pcall(function()
-    return loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
-end)
 
 -- ==========================================================
 -- Window
 -- ==========================================================
-local Window = Fluent:CreateWindow({
+local Window = Library:CreateWindow({
     Title = "Blox Fruits Hub",
     SubTitle = "Universal Roblox Hub",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
-    Acrylic = true,
+    Acrylic = false, -- ปิด Acrylic เพื่อป้องกันปัญหาจอดำ/ไม่แสดงผลในบาง Executor
     Theme = "Dark",
     MinimizeKey = Enum.KeyCode.LeftControl
 })
@@ -108,13 +98,13 @@ local Tabs = {
     Credits = Window:AddTab({ Title = "Credits", Icon = "info" })
 }
 
-local Options = Fluent.Options
+local Options = Library.Options
 
 -- ==========================================================
 -- Main Functions
 -- ==========================================================
 
--- ตรวจสอบและดึงข้อมูล Character & Humanoid
+-- ดึงข้อมูล Character, Humanoid และ HumanoidRootPart อย่างปลอดภัย
 local function GetCharacterParts()
     local character = LocalPlayer.Character
     if not character then return nil, nil, nil end
@@ -127,7 +117,7 @@ end
 local function SafeTeleport(targetCFrame, destinationName)
     local _, humanoid, rootPart = GetCharacterParts()
     if not humanoid or not rootPart then
-        Fluent:Notify({
+        Library:Notify({
             Title = "Teleport Error",
             Content = "ไม่พบตัวละครหรือ HumanoidRootPart",
             Duration = 3
@@ -136,9 +126,9 @@ local function SafeTeleport(targetCFrame, destinationName)
     end
 
     if humanoid.Health <= 0 then
-        Fluent:Notify({
+        Library:Notify({
             Title = "Teleport Error",
-            Content = "ตัวละครหมดสติ (Dead) ไม่สามารถวาร์ปได้",
+            Content = "ตัวละครตาย ไม่สามารถวาร์ปได้",
             Duration = 3
         })
         return false
@@ -149,14 +139,14 @@ local function SafeTeleport(targetCFrame, destinationName)
     end)
 
     if success then
-        Fluent:Notify({
+        Library:Notify({
             Title = "Teleport Success",
-            Content = "วาร์ปไปยัง " .. (destinationName or "พิกัดเป้าหมาย") .. " สำเร็จ!",
+            Content = "วาร์ปไปยัง " .. (destinationName or "เป้าหมาย") .. " สำเร็จ!",
             Duration = 3
         })
         return true
     else
-        Fluent:Notify({
+        Library:Notify({
             Title = "Teleport Failed",
             Content = "เกิดข้อผิดพลาด: " .. tostring(err),
             Duration = 4
@@ -167,7 +157,7 @@ end
 
 -- ฟังก์ชัน Rejoin เซิร์ฟเวอร์เดิม
 local function RejoinServer()
-    Fluent:Notify({
+    Library:Notify({
         Title = "Rejoining",
         Content = "กำลังเชื่อมต่อเซิร์ฟเวอร์ใหม่...",
         Duration = 3
@@ -177,19 +167,19 @@ local function RejoinServer()
         TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
     end)
     if not success then
-        Fluent:Notify({
-            Title = "Rejoin Error",
-            Content = "ไม่สามารถ Rejoin ได้: " .. tostring(err),
+        Library:Notify({
+            Title = "Rejoin Failed",
+            Content = "ไม่สามารถเชื่อมต่อใหม่ได้: " .. tostring(err),
             Duration = 4
         })
     end
 end
 
--- ฟังก์ชัน Server Hop (สุ่มย้ายเซิร์ฟเวอร์)
+-- ฟังก์ชัน Server Hop ย้ายเซิร์ฟเวอร์
 local function ServerHop()
-    Fluent:Notify({
+    Library:Notify({
         Title = "Server Hop",
-        Content = "กำลังค้นหาเซิร์ฟเวอร์ที่มีผู้เล่นว่าง...",
+        Content = "กำลังค้นหาเซิร์ฟเวอร์ใหม่...",
         Duration = 4
     })
     task.spawn(function()
@@ -201,7 +191,7 @@ local function ServerHop()
         end)
         
         if not fetchSuccess or not response then
-            Fluent:Notify({
+            Library:Notify({
                 Title = "Server Hop Error",
                 Content = "ไม่สามารถดึงข้อมูลเซิร์ฟเวอร์ได้",
                 Duration = 4
@@ -214,7 +204,7 @@ local function ServerHop()
         end)
 
         if not decodeSuccess or not data or not data.data then
-            Fluent:Notify({
+            Library:Notify({
                 Title = "Server Hop Error",
                 Content = "ข้อมูลเซิร์ฟเวอร์ไม่ถูกต้อง",
                 Duration = 4
@@ -235,7 +225,7 @@ local function ServerHop()
         if targetServer then
             TeleportService:TeleportToPlaceInstance(placeId, targetServer, LocalPlayer)
         else
-            Fluent:Notify({
+            Library:Notify({
                 Title = "Server Hop",
                 Content = "ไม่พบเซิร์ฟเวอร์อื่นที่เหมาะสม",
                 Duration = 4
@@ -244,7 +234,7 @@ local function ServerHop()
     end)
 end
 
--- ดึงข้อมูล Level ของผู้เล่น
+-- ฟังก์ชันดึงค่า Level
 local function GetPlayerLevel()
     local leaderstats = LocalPlayer:FindFirstChild("leaderstats")
     if leaderstats then
@@ -256,7 +246,7 @@ local function GetPlayerLevel()
         local lvl = data:FindFirstChild("Level")
         if lvl then return tostring(lvl.Value) end
     end
-    return "N/A (Custom Game)"
+    return "N/A"
 end
 
 -- ฟังก์ชันสร้าง Highlight
@@ -273,7 +263,7 @@ local function CreateHighlight(adornee, color, fillTrans)
     return highlight
 end
 
--- ฟังก์ชันสร้าง BillboardGui
+-- ฟังก์ชันสร้าง BillboardGui สำหรับแสดงชื่อและระยะทาง
 local function CreateBillboard(adorneePart, textContent, textColor)
     if not adorneePart or not adorneePart:IsA("BasePart") then return nil end
     local bbg = Instance.new("BillboardGui")
@@ -320,48 +310,50 @@ end
 -- Main Tab
 -- ==========================================================
 Tabs.Main:AddParagraph({
-    Title = "Welcome to Blox Fruits Hub",
-    Content = "สคริปต์ Universal Hub สำหรับการควบคุม ทดสอบระบบ และพัฒนาเกม"
+    Title = "Status Overview",
+    Content = "ข้อมูลสถานะตัวละครและการทำงานของระบบ"
 })
 
 local StatusParagraph = Tabs.Main:AddParagraph({
-    Title = "Player & Character Status",
-    Content = "กำลังโหลดข้อมูลสถานะ..."
+    Title = "Player Information",
+    Content = "กำลังโหลดข้อมูล..."
 })
 
--- Heartbeat Loop: อัปเดตข้อมูลตัวละครแบบ Real-time
-local StatusConnection = RunService.Heartbeat:Connect(function()
-    if not HubState.Running then return end
-    
-    local _, humanoid, rootPart = GetCharacterParts()
-    local level = GetPlayerLevel()
-    local hp = humanoid and math.floor(humanoid.Health) or 0
-    local maxHp = humanoid and math.floor(humanoid.MaxHealth) or 0
-    local speed = humanoid and math.floor(humanoid.WalkSpeed) or 0
-    local jump = humanoid and math.floor(humanoid.JumpPower) or 0
-    local pos = rootPart and string.format("X: %.1f | Y: %.1f | Z: %.1f", rootPart.Position.X, rootPart.Position.Y, rootPart.Position.Z) or "N/A"
+-- ลูปอัปเดตข้อมูลสถานะ (ใช้รอบหน่วง 0.5 วินาทีเพื่อความเสถียร ไม่กิน CPU)
+task.spawn(function()
+    while HubState.Running do
+        task.wait(0.5)
+        local _, humanoid, rootPart = GetCharacterParts()
+        local level = GetPlayerLevel()
+        local hp = humanoid and math.floor(humanoid.Health) or 0
+        local maxHp = humanoid and math.floor(humanoid.MaxHealth) or 0
+        local speed = humanoid and math.floor(humanoid.WalkSpeed) or 0
+        local jump = humanoid and math.floor(humanoid.JumpPower) or 0
+        local pos = rootPart and string.format("X: %.1f | Y: %.1f | Z: %.1f", rootPart.Position.X, rootPart.Position.Y, rootPart.Position.Z) or "N/A"
 
-    local contentString = string.format(
-        "• Player: %s\n• Level: %s\n• Health: %d / %d\n• WalkSpeed: %d\n• JumpPower: %d\n• Position: %s",
-        LocalPlayer.DisplayName .. " (@" .. LocalPlayer.Name .. ")",
-        level,
-        hp,
-        maxHp,
-        speed,
-        jump,
-        pos
-    )
+        local text = string.format(
+            "• Player: %s\n• Level: %s\n• Health: %d / %d\n• WalkSpeed: %d\n• JumpPower: %d\n• Position: %s",
+            LocalPlayer.DisplayName .. " (@" .. LocalPlayer.Name .. ")",
+            level,
+            hp,
+            maxHp,
+            speed,
+            jump,
+            pos
+        )
 
-    StatusParagraph:SetDesc(contentString)
+        pcall(function()
+            StatusParagraph:SetDesc(text)
+        end)
+    end
 end)
-table.insert(HubState.Connections, StatusConnection)
 
 -- ==========================================================
 -- Player Tab
 -- ==========================================================
-Tabs.Player:AddSlider("WalkSpeedSlider", {
-    Title = "WalkSpeed",
-    Description = "ปรับระดับความเร็วการเดินของตัวละคร",
+local SpeedSlider = Tabs.Player:AddSlider("WalkSpeedSlider", {
+    Title = "WalkSpeed Slider",
+    Description = "ปรับความเร็วในการเดิน",
     Default = 16,
     Min = 16,
     Max = 250,
@@ -375,7 +367,7 @@ Tabs.Player:AddSlider("WalkSpeedSlider", {
     end
 })
 
-Tabs.Player:AddToggle("SpeedToggle", {
+local SpeedToggle = Tabs.Player:AddToggle("SpeedToggle", {
     Title = "Enable Custom WalkSpeed",
     Default = false,
     Callback = function(Value)
@@ -384,17 +376,17 @@ Tabs.Player:AddToggle("SpeedToggle", {
         if humanoid then
             humanoid.WalkSpeed = Value and HubState.PlayerMods.WalkSpeed or 16
         end
-        Fluent:Notify({
-            Title = "Player Setting",
-            Content = "WalkSpeed Override: " .. (Value and "เปิดใช้งาน" or "ปิดใช้งาน"),
+        Library:Notify({
+            Title = "WalkSpeed",
+            Content = "WalkSpeed: " .. (Value and "เปิดใช้งาน" or "ปิดใช้งาน"),
             Duration = 2
         })
     end
 })
 
-Tabs.Player:AddSlider("JumpPowerSlider", {
-    Title = "JumpPower",
-    Description = "ปรับระดับแรงกระโดดของตัวละคร",
+local JumpSlider = Tabs.Player:AddSlider("JumpPowerSlider", {
+    Title = "JumpPower Slider",
+    Description = "ปรับแรงกระโดด",
     Default = 50,
     Min = 50,
     Max = 300,
@@ -408,7 +400,7 @@ Tabs.Player:AddSlider("JumpPowerSlider", {
     end
 })
 
-Tabs.Player:AddToggle("JumpToggle", {
+local JumpToggle = Tabs.Player:AddToggle("JumpToggle", {
     Title = "Enable Custom JumpPower",
     Default = false,
     Callback = function(Value)
@@ -418,15 +410,15 @@ Tabs.Player:AddToggle("JumpToggle", {
             humanoid.UseJumpPower = true
             humanoid.JumpPower = Value and HubState.PlayerMods.JumpPower or 50
         end
-        Fluent:Notify({
-            Title = "Player Setting",
-            Content = "JumpPower Override: " .. (Value and "เปิดใช้งาน" or "ปิดใช้งาน"),
+        Library:Notify({
+            Title = "JumpPower",
+            Content = "JumpPower: " .. (Value and "เปิดใช้งาน" or "ปิดใช้งาน"),
             Duration = 2
         })
     end
 })
 
--- รักษาระดับ Speed & Jump แม้ตัวละครเปลี่ยนหรือรีเซ็ต
+-- รักษาระดับ Speed & Jump แม้ตัวละครถูกเปลี่ยนค่า
 local ModifiersConnection = RunService.Stepped:Connect(function()
     if not HubState.Running then return end
     local _, humanoid = GetCharacterParts()
@@ -444,18 +436,18 @@ table.insert(HubState.Connections, ModifiersConnection)
 
 Tabs.Player:AddButton({
     Title = "Reset Character",
-    Description = "สั่งให้ตัวละครตายและเกิดใหม่ทันที",
+    Description = "รีเซ็ตตัวละครทันที",
     Callback = function()
         local _, humanoid = GetCharacterParts()
         if humanoid then
             humanoid.Health = 0
-            Fluent:Notify({
+            Library:Notify({
                 Title = "Character Reset",
                 Content = "สั่งรีเซ็ตตัวละครสำเร็จ",
                 Duration = 2
             })
         else
-            Fluent:Notify({
+            Library:Notify({
                 Title = "Reset Error",
                 Content = "ไม่พบ Humanoid",
                 Duration = 3
@@ -466,7 +458,7 @@ Tabs.Player:AddButton({
 
 Tabs.Player:AddButton({
     Title = "Rejoin Server",
-    Description = "ออกจากเกมและเข้าเซิร์ฟเวอร์เดิมใหม่อีกครั้ง",
+    Description = "เชื่อมต่อกลับเข้าสู่เซิร์ฟเวอร์เดิม",
     Callback = function()
         RejoinServer()
     end
@@ -474,7 +466,7 @@ Tabs.Player:AddButton({
 
 Tabs.Player:AddButton({
     Title = "Server Hop",
-    Description = "ค้นหาและย้ายไปยังเซิร์ฟเวอร์อื่นที่มีผู้เล่น",
+    Description = "สุ่มย้ายเซิร์ฟเวอร์ที่มีผู้เล่นว่าง",
     Callback = function()
         ServerHop()
     end
@@ -503,13 +495,13 @@ Tabs.Teleport:AddDropdown("LocationDropdown", {
 
 Tabs.Teleport:AddButton({
     Title = "Teleport to Selected Location",
-    Description = "วาร์ปไปยังสถานที่ที่เลือกไว้ในเมนูด้านบน",
+    Description = "วาร์ปไปยังสถานที่ที่เลือกใน Dropdown",
     Callback = function()
         local targetCFrame = Locations[SelectedLocation]
         if targetCFrame then
             SafeTeleport(targetCFrame, SelectedLocation)
         else
-            Fluent:Notify({
+            Library:Notify({
                 Title = "Teleport Error",
                 Content = "ไม่พบพิกัดของสถานที่ที่เลือก",
                 Duration = 3
@@ -519,13 +511,13 @@ Tabs.Teleport:AddButton({
 })
 
 Tabs.Teleport:AddParagraph({
-    Title = "Quick Teleport Locations",
-    Content = "กดปุ่มเพื่อวาร์ปไปยังสถานที่ปลายทางได้ทันที"
+    Title = "Quick Teleport List",
+    Content = "กดปุ่มเพื่อวาร์ปไปยังสถานที่ต่างๆ ได้โดยตรง"
 })
 
 for _, locName in ipairs(LocationNames) do
     Tabs.Teleport:AddButton({
-        Title = "Teleport: " .. locName,
+        Title = "Go to: " .. locName,
         Callback = function()
             SafeTeleport(Locations[locName], locName)
         end
@@ -535,14 +527,9 @@ end
 -- ==========================================================
 -- Visual Tab
 -- ==========================================================
-Tabs.Visual:AddParagraph({
-    Title = "Visual & ESP Debugging",
-    Content = "ระบบแสดงผลวัตถุ ผู้เล่น และ NPC เพื่อการทดสอบในเกม"
-})
-
 Tabs.Visual:AddToggle("PlayerESPToggle", {
-    Title = "Player ESP & Highlight",
-    Description = "แสดงชื่อ ระยะห่าง และ Highlight ผู้เล่นคนอื่นในเซิร์ฟเวอร์",
+    Title = "Highlight & ESP ผู้เล่น",
+    Description = "แสดงชื่อ ระยะห่าง และ Highlight ผู้เล่นอื่น",
     Default = false,
     Callback = function(Value)
         HubState.Visuals.PlayerESP = Value
@@ -555,8 +542,8 @@ Tabs.Visual:AddToggle("PlayerESPToggle", {
 })
 
 Tabs.Visual:AddToggle("NpcESPToggle", {
-    Title = "NPC / Monster Highlight",
-    Description = "Highlight มอนสเตอร์และ NPC ในแผนที่",
+    Title = "Highlight NPC / มอนสเตอร์",
+    Description = "แสดง Highlight รอบตัว NPC ในเกม",
     Default = false,
     Callback = function(Value)
         HubState.Visuals.NpcESP = Value
@@ -567,8 +554,8 @@ Tabs.Visual:AddToggle("NpcESPToggle", {
 })
 
 Tabs.Visual:AddToggle("PoiESPToggle", {
-    Title = "Points of Interest (POI) ESP",
-    Description = "แสดงจุดสำคัญ เช่น ร้านค้า จุดรับเควสต์ จุดเกิดบอส",
+    Title = "Highlight จุดสำคัญ (POI)",
+    Description = "แสดงจุดสำคัญ เช่น ร้านค้า จุดเควสต์ และ Safe Zone",
     Default = false,
     Callback = function(Value)
         HubState.Visuals.PoiESP = Value
@@ -578,13 +565,13 @@ Tabs.Visual:AddToggle("PoiESPToggle", {
     end
 })
 
--- เธรดจัดการการแสดงผล Visuals (ประหยัด CPU ด้วย Interval 0.2 วินาที)
+-- ลูปจัดการการแสดงผล ESP (ทำงานทุก 0.2 วินาที)
 task.spawn(function()
     while HubState.Running do
         task.wait(0.2)
         local _, _, myRoot = GetCharacterParts()
 
-        -- 1. Player ESP Loop
+        -- 1. Player ESP
         if HubState.Visuals.PlayerESP and myRoot then
             for _, player in ipairs(Players:GetPlayers()) do
                 if player ~= LocalPlayer then
@@ -615,7 +602,7 @@ task.spawn(function()
             end
         end
 
-        -- 2. NPC ESP Loop
+        -- 2. NPC ESP
         if HubState.Visuals.NpcESP and myRoot then
             if not HubState.Visuals.Containers["NPCs"] then
                 HubState.Visuals.Containers["NPCs"] = {}
@@ -634,7 +621,7 @@ task.spawn(function()
             end
         end
 
-        -- 3. Points of Interest ESP Loop
+        -- 3. Points of Interest ESP
         if HubState.Visuals.PoiESP and myRoot then
             if not HubState.Visuals.Containers["POI"] then
                 HubState.Visuals.Containers["POI"] = {}
@@ -668,33 +655,36 @@ end)
 -- ==========================================================
 -- Settings Tab
 -- ==========================================================
-if InterfaceManagerSuccess and InterfaceManager then
-    InterfaceManager:SetLibrary(Fluent)
-    InterfaceManager:SetFolder("BloxFruitsHub")
-    InterfaceManager:BuildInterfaceSection(Tabs.Settings)
-end
-
-if SaveManagerSuccess and SaveManager then
-    SaveManager:SetLibrary(Fluent)
-    SaveManager:IgnoreThemeSettings()
-    SaveManager:SetIgnoreIndexes({})
-    SaveManager:SetFolder("BloxFruitsHub/Config")
-    SaveManager:BuildConfigSection(Tabs.Settings)
-end
-
-Tabs.Settings:AddParagraph({
-    Title = "Script Management",
-    Content = "จัดการและควบคุมการทำงานของตัว Hub"
+Tabs.Settings:AddDropdown("ThemeDropdown", {
+    Title = "UI Theme",
+    Values = { "Dark", "Darker", "Light", "Aqua", "Amethyst", "Rose" },
+    Default = "Dark",
+    Callback = function(Value)
+        Library:SetTheme(Value)
+        Library:Notify({
+            Title = "Theme Changed",
+            Content = "เปลี่ยนธีมเป็น: " .. Value,
+            Duration = 2
+        })
+    end
 })
 
 Tabs.Settings:AddButton({
-    Title = "Destroy UI & Clean Up",
-    Description = "ปิดการทำงานของ Script ทำลาย UI และล้าง Connection ทั้งหมด",
+    Title = "Rejoin Server",
+    Description = "เชื่อมต่อกลับเข้าสู่เซิร์ฟเวอร์",
+    Callback = function()
+        RejoinServer()
+    end
+})
+
+Tabs.Settings:AddButton({
+    Title = "Destroy UI",
+    Description = "ปิดการทำงานและทำลาย UI ทั้งหมด",
     Callback = function()
         HubState:Destroy()
-        Fluent:Notify({
+        Library:Notify({
             Title = "Blox Fruits Hub",
-            Content = "ปิดการทำงานและทำลาย UI เรียบร้อยแล้ว",
+            Content = "UI ถูกทำลายเรียบร้อยแล้ว",
             Duration = 3
         })
     end
@@ -704,28 +694,28 @@ Tabs.Settings:AddButton({
 -- Credits Tab
 -- ==========================================================
 Tabs.Credits:AddParagraph({
-    Title = "Blox Fruits Hub Project",
-    Content = "Universal Roblox Hub Architecture\nสร้างขึ้นด้วย Fluent UI Library โดย dawid-scripts"
+    Title = "Blox Fruits Hub",
+    Content = "Universal Roblox Hub Architecture\nสร้างด้วย Fluent Library โดย dawid-scripts"
 })
 
 Tabs.Credits:AddParagraph({
-    Title = "Features & Highlights",
-    Content = "• Smooth Draggable Fluent UI\n• Real-Time Health, Speed & Level Display\n• WalkSpeed & JumpPower Overrides\n• Safe CFrame Teleportation System\n• Modular ESP & Highlight Engine\n• Memory Leak & Connection Protected"
+    Title = "Information",
+    Content = "• ธีม: Blox Fruits & Universal Hub\n• รองรับทั้ง PC และ Mobile\n• ระบบความปลอดภัยและ Memory Management เต็มรูปแบบ"
 })
 
 Tabs.Credits:AddButton({
-    Title = "Copy Project Link / Community",
-    Description = "คัดลอกลิงก์คอมมูนิตี้ไปยัง Clipboard",
+    Title = "Copy Community Link",
+    Description = "คัดลอกลิงก์ไปยัง Clipboard",
     Callback = function()
         if setclipboard then
             setclipboard("https://discord.gg/example")
-            Fluent:Notify({
+            Library:Notify({
                 Title = "Clipboard",
-                Content = "คัดลอกลิงก์สำเร็จ!",
+                Content = "คัดลอกลิงก์เรียบร้อยแล้ว!",
                 Duration = 3
             })
         else
-            Fluent:Notify({
+            Library:Notify({
                 Title = "Clipboard Error",
                 Content = "Executor ไม่รองรับฟังก์ชัน setclipboard",
                 Duration = 3
@@ -735,12 +725,12 @@ Tabs.Credits:AddButton({
 })
 
 -- ==========================================================
--- Notifications & Teardown Lifecycle
+-- Notifications & Lifecycle Teardown
 -- ==========================================================
 function HubState:Destroy()
     HubState.Running = false
 
-    -- ยกเลิกการเชื่อมต่อ Events ทั้งหมด
+    -- Disconnect Events
     for _, conn in pairs(HubState.Connections) do
         if conn and typeof(conn) == "RBXScriptConnection" then
             pcall(function() conn:Disconnect() end)
@@ -748,17 +738,17 @@ function HubState:Destroy()
     end
     HubState.Connections = {}
 
-    -- ล้าง Visuals ทั้งหมดออกจากหน่วยความจำ
+    -- ล้าง Visuals
     ClearAllVisuals()
 
-    -- คืนค่าความเร็วและแรงกระโดดตัวละครเป็นค่าเริ่มต้น
+    -- คืนค่าเดิมให้ตัวละคร
     local _, humanoid = GetCharacterParts()
     if humanoid then
         humanoid.WalkSpeed = 16
         humanoid.JumpPower = 50
     end
 
-    -- ทำลาย Fluent Window
+    -- ทำลาย Window
     if Window then
         pcall(function()
             Window:Destroy()
@@ -771,14 +761,10 @@ end
 -- ==========================================================
 -- Initialization
 -- ==========================================================
-if SaveManagerSuccess and SaveManager then
-    SaveManager:LoadAutoloadConfig()
-end
-
 Window:SelectTab(1)
 
-Fluent:Notify({
+Library:Notify({
     Title = "Blox Fruits Hub",
-    Content = "Script Loaded Successfully! (กด Left Control เพื่อย่อ/ขยาย UI)",
+    Content = "Script Loaded Successfully! กด LeftControl เพื่อเปิด/ปิดเมนู",
     Duration = 5
 })
