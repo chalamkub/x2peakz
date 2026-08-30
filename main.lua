@@ -62,10 +62,10 @@ end
 -- ==========================================
 local Window = Fluent:CreateWindow({
     Title = "Ninja Legends Hub",
-    SubTitle = "by Antigravity",
+    SubTitle = "Mobile Fixed Edition",
     TabWidth = 160,
     Size = UDim2.fromOffset(580, 460),
-    Acrylic = true,
+    Acrylic = false, -- ปิด Acrylic เพื่อแก้ปัญหาทัชติดขัดบนมือถือ
     Theme = "Dark",
     MinimizeKey = Enum.KeyCode.RightControl
 })
@@ -386,7 +386,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- ลูปบังคับ WalkSpeed & JumpPower ไม่ให้เกมรีเซ็ต
+-- ลูปบังคับ WalkSpeed & JumpPower
 task.spawn(function()
     while true do
         task.wait(0.1)
@@ -457,18 +457,6 @@ Tabs.Misc:AddParagraph({
     Content = "ฟังก์ชั่นช่วยเหลือเพิ่มเติม"
 })
 
-Tabs.Misc:AddButton({
-    Title = "Anti-AFK (เปิดอัตโนมัติอยู่แล้ว)",
-    Description = "ป้องกันการเด้งออกจากเกมเมื่อไม่ได้ขยับ",
-    Callback = function()
-        Fluent:Notify({
-            Title = "Anti-AFK",
-            Content = "Anti-AFK ทำงานอัตโนมัติอยู่แล้วครับ!",
-            Duration = 3
-        })
-    end
-})
-
 -- Anti-AFK Hook
 LocalPlayer.Idled:Connect(function()
     VirtualUser:CaptureController()
@@ -478,10 +466,11 @@ end)
 Window:SelectTab(1)
 
 -- ==========================================
--- 2. ส่วนของปุ่มโลโก้เปิด-ปิด UI (Mobile & PC Floating Button)
+-- 2. ส่วนของปุ่มโลโก้เปิด-ปิด UI (Floating Button)
 -- ==========================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MyLogoToggle"
+ScreenGui.ResetOnSpawn = false
 
 local guiParent
 if gethui then
@@ -504,6 +493,7 @@ LogoButton.BackgroundTransparency = 1
 LogoButton.Position = UDim2.new(0.1, 0, 0.1, 0) 
 LogoButton.Size = UDim2.new(0, 50, 0, 50) 
 LogoButton.Image = "rbxthumb://type=Asset&id=138065724886036&w=150&h=150" 
+LogoButton.Modal = false
 
 local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(0.5, 0)
@@ -550,24 +540,52 @@ LogoButton.MouseButton1Click:Connect(function()
 end)
 
 -- ==========================================
--- 3. อัปเดตระบบแก้ปัญหาปุ่มเดิน/กระโดดหายบนมือถือ (ขั้นเด็ดขาด)
+-- 3. ระบบแก้บัคปุ่มเดิน/กระโดดหายบนมือถือ (Ultimate Touch Fix)
 -- ==========================================
 task.spawn(function()
-    while task.wait(0.1) do
+    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+    -- 1. ปิด Modal ทันทีที่ UI หรือองค์ประกอบใหม่ถูกโหลด
+    local function cleanModal(v)
+        if v:IsA("GuiObject") and v.Modal then
+            v.Modal = false
+        end
+    end
+
+    local uiContainers = { PlayerGui }
+    if gethui then pcall(function() table.insert(uiContainers, gethui()) end) end
+    pcall(function() table.insert(uiContainers, game:GetService("CoreGui")) end)
+
+    for _, container in ipairs(uiContainers) do
+        for _, desc in ipairs(container:GetDescendants()) do
+            cleanModal(desc)
+        end
+        container.DescendantAdded:Connect(cleanModal)
+    end
+
+    -- 2. บังคับ TouchGui และปุ่มคอนโทรลทุกชิ้นให้ Visible ตลอดเวลาในระดับ RenderStepped
+    RunService.RenderStepped:Connect(function()
         pcall(function()
             LocalPlayer.DevTouchMovementMode = Enum.DevTouchMovementMode.DynamicThumbstick
             
-            local uiParents = { LocalPlayer:WaitForChild("PlayerGui") }
-            if gethui then table.insert(uiParents, gethui()) end
-            pcall(function() table.insert(uiParents, game:GetService("CoreGui")) end)
-
-            for _, parent in pairs(uiParents) do
-                for _, v in pairs(parent:GetDescendants()) do
-                    if v:IsA("GuiObject") and v.Modal then
-                        v.Modal = false
+            local touchGui = PlayerGui:FindFirstChild("TouchGui")
+            if touchGui then
+                touchGui.Enabled = true
+                local touchControl = touchGui:FindFirstChild("TouchControlFrame")
+                if touchControl then
+                    touchControl.Visible = true
+                    
+                    local jumpButton = touchControl:FindFirstChild("JumpButton")
+                    if jumpButton then
+                        jumpButton.Visible = true
+                    end
+                    
+                    local dynamicStick = touchControl:FindFirstChild("DynamicThumbstickFrame")
+                    if dynamicStick then
+                        dynamicStick.Visible = true
                     end
                 end
             end
         end)
-    end
+    end)
 end)
