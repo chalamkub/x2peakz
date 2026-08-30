@@ -19,6 +19,7 @@ local Tabs = {
 
 _G.AutoFarm = false 
 
+-- ปุ่มเปิด/ปิด ออโต้ฟาร์ม
 local Toggle = Tabs.Main:AddToggle("AutoFarmToggle", {
     Title = "Auto Farm (Swing Katana)",
     Default = false,
@@ -39,10 +40,23 @@ local Toggle = Tabs.Main:AddToggle("AutoFarmToggle", {
     end
 })
 
+-- ปุ่มวาร์ป (Teleport) ตามพิกัดที่ขอ
+Tabs.Main:AddButton({
+    Title = "Teleport to Location",
+    Description = "วาร์ปไปยังพิกัด 167, 91245, 132",
+    Callback = function()
+        local player = game:GetService("Players").LocalPlayer
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            -- สั่งย้ายตำแหน่งตัวละครไปยังพิกัดที่กำหนด
+            player.Character.HumanoidRootPart.CFrame = CFrame.new(167, 91245, 132)
+        end
+    end
+})
+
 Window:SelectTab(1)
 
 -- ==========================================
--- 2. ส่วนของปุ่มโลโก้ (แก้ไขปัญหาโลโก้ล่องหน)
+-- 2. ส่วนของปุ่มโลโก้เปิด-ปิด UI
 -- ==========================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MyLogoToggle"
@@ -115,12 +129,17 @@ LogoButton.MouseButton1Click:Connect(function()
 end)
 
 -- ==========================================
--- 3. ระบบแก้ปัญหาปุ่มเดิน/กระโดดหายบนมือถือ (Anti-Modal)
+-- 3. อัปเดตระบบแก้ปัญหาปุ่มเดิน/กระโดดหายบนมือถือ (ขั้นเด็ดขาด)
 -- ==========================================
 task.spawn(function()
-    while task.wait(0.5) do 
+    local player = game:GetService("Players").LocalPlayer
+    while task.wait(0.1) do -- รันเช็คทุกๆ 0.1 วินาที
         pcall(function()
-            local uiParents = { game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui") }
+            -- 1. บังคับเปลี่ยนโหมดการเดินให้เป็นของมือถือเสมอ
+            player.DevTouchMovementMode = Enum.DevTouchMovementMode.DynamicThumbstick
+            
+            -- 2. รวบรวม UI และไล่ปิด Modal
+            local uiParents = { player:WaitForChild("PlayerGui") }
             if gethui then table.insert(uiParents, gethui()) end
             pcall(function() table.insert(uiParents, game:GetService("CoreGui")) end)
 
